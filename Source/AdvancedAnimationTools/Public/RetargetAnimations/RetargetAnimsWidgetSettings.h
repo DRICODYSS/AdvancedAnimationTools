@@ -21,12 +21,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Retargeter")
 	TObjectPtr<UIKRetargeter> RetargetAsset;
 
-	// UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dependencies")
-	// bool bBindDependenciesToNewAssets = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Retargeter")
+	bool bReplaceReferences = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Path")
+	bool bUseCustomPath = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Path", meta = (EditCondition = "bUseCustomPath"))
 	FName Path = NAME_None;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Path")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Path", meta = (EditCondition = "bUseCustomPath"))
 	FName RootFolderName = "Animations";
 };

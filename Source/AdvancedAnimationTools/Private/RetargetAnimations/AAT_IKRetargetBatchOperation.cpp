@@ -6,6 +6,7 @@
 #include "AssetToolsModule.h"
 #include "ContentBrowserModule.h"
 #include "EditorReimportHandler.h"
+#include "FileHelpers.h"
 #include "SSkeletonWidget.h"
 #include "EditorFramework/AssetImportData.h"
 #include "Framework/Notifications/NotificationManager.h"
@@ -108,7 +109,7 @@ void UAAT_IKRetargetBatchOperation::DuplicateRetargetAssets(
 		Progress.EnterProgressFrame(1.f, FText::Format(LOCTEXT("DuplicatingAnimation", "Duplicating animation: {0}"), FText::FromString(AssetName)));
 
 		FNameDuplicationRule NameRule = Context.NameRule;
-		if (Context.bUseSourcePath)
+		if (Context.bUseCustomPath)
 		{
 			FString AssetPath = Asset->GetPathName();
 			FString AssetFolderPath = FPackageName::GetLongPackagePath(AssetPath);
@@ -135,6 +136,10 @@ void UAAT_IKRetargetBatchOperation::DuplicateRetargetAssets(
 			FString BaseTargetPath = Context.Path;
 			FString TargetFolderPath = FPaths::Combine(BaseTargetPath, SubFolderPath);
 			NameRule.FolderPath = TargetFolderPath;
+		}
+		else
+		{
+			NameRule.FolderPath = FPackageName::GetLongPackagePath(Asset->GetPathName()) / TEXT("");
 		}
 		
 		TMap<UAnimationAsset*, UAnimationAsset*> DuplicateMap = DuplicateAssets<UAnimationAsset>({Asset}, DestinationPackage, &NameRule);
@@ -566,11 +571,6 @@ void UAAT_IKRetargetBatchOperation::RemapCurves(const FAAT_IKRetargetBatchOperat
 
 void UAAT_IKRetargetBatchOperation::OverwriteExistingAssets(const FAAT_IKRetargetBatchOperationContext& Context, FScopedSlowTask& Progress)
 {
-	// if (!Context.bOverwriteExistingFiles)
-	// {
-	// 	return;
-	// }
-
 	FAssetRegistryModule& AssetRegistryModule = FModuleManager::Get().LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
 	FAssetToolsModule& AssetToolsModule = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools");
 
@@ -579,50 +579,45 @@ void UAAT_IKRetargetBatchOperation::OverwriteExistingAssets(const FAAT_IKRetarge
 		UAnimationAsset* OldAsset = Pair.Key;
 		UAnimationAsset* NewAsset = Pair.Value;
 
+		if (!OldAsset || !NewAsset) continue;
+
 		FString DesiredObjectName = Context.NameRule.Rename(OldAsset);
-		if (NewAsset->GetName() == DesiredObjectName)
-		{
-			if (Context.bBindDependenciesToNewAssets)
-			{
-				FString PathName = FPackageName::GetLongPackagePath(OldAsset->GetPathName());
-				FString DesiredPackageName = PathName + "/" + DesiredObjectName;
-				FString DesiredObjectPath = DesiredPackageName + "." + DesiredObjectName;
-				FAssetData AssetDataToReplace = AssetRegistryModule.Get().GetAssetByObjectPath(FSoftObjectPath(DesiredObjectPath));
-				UObject* AssetToReplace = AssetDataToReplace.GetAsset();
-				TArray<UObject*> AssetsToReplace = {AssetToReplace};
-
-				ObjectTools::ForceReplaceReferences(NewAsset, AssetsToReplace);
-			}
-			continue;
-		}
-
 		FString PathName = FPackageName::GetLongPackagePath(NewAsset->GetPathName());
-		FString DesiredPackageName = PathName + "/" + DesiredObjectName;
-		FString DesiredObjectPath = DesiredPackageName + "." + DesiredObjectName;
-		FAssetData AssetDataToReplace = AssetRegistryModule.Get().GetAssetByObjectPath(FSoftObjectPath(DesiredObjectPath));
-		const bool bHasDuplicateToReplace = AssetDataToReplace.IsValid() && AssetDataToReplace.GetAsset()->GetClass() == OldAsset->GetClass();
-		if (!bHasDuplicateToReplace)
+		FString DesiredPackagePath = PathName;
+		FString DesiredObjectPath = DesiredPackagePath + TEXT(".") + DesiredObjectName;
+
+		if (Context.bReplaceReferences)
 		{
-			continue;
+			TArray<UObject*> ReplaceThese = { OldAsset };
+			UE_LOG(LogTemp, Log, TEXT("[OverwriteExistingAssets] Replacing references to %s with %s"), *OldAsset->GetPathName(), *NewAsset->GetPathName());
+			ObjectTools::ForceReplaceReferences(NewAsset, ReplaceThese);
 		}
 
-		UObject* AssetToReplace = AssetDataToReplace.GetAsset();
-		if (AssetToReplace == OldAsset)
+		FAssetData AssetDataAtDesired = AssetRegistryModule.Get().GetAssetByObjectPath(FSoftObjectPath(DesiredObjectPath));
+		if (AssetDataAtDesired.IsValid())
 		{
-			if (Context.bBindDependenciesToNewAssets)
+			UObject* AssetAtDesired = AssetDataAtDesired.GetAsset();
+			if (AssetAtDesired && AssetAtDesired != NewAsset)
 			{
-				TArray<UObject*> AssetsToReplace = {OldAsset};
-				ObjectTools::ForceReplaceReferences(NewAsset, AssetsToReplace);
+				UE_LOG(LogTemp, Log, TEXT("[OverwriteExistingAssets] Deleting duplicate asset at desired path: %s"), *AssetAtDesired->GetPathName());
+				ObjectTools::ForceDeleteObjects({ AssetAtDesired }, false);
 			}
-			continue;
 		}
 
-		TArray<UObject*> AssetsToReplace = {AssetToReplace};
-		ObjectTools::ForceReplaceReferences(NewAsset, AssetsToReplace);
-		ObjectTools::ForceDeleteObjects({AssetToReplace}, false);
-		FString CurrentAssetPath = NewAsset->GetPathName();
-		TArray<FAssetRenameData> AssetsToRename = { FAssetRenameData(CurrentAssetPath, DesiredObjectPath) };
-		AssetToolsModule.Get().RenameAssets(AssetsToRename);
+		if (NewAsset->GetName() != DesiredObjectName || FPackageName::GetLongPackagePath(NewAsset->GetPathName()) != DesiredPackagePath)
+		{
+			UE_LOG(LogTemp, Log, TEXT("[OverwriteExistingAssets] Renaming %s -> %s/%s"), *NewAsset->GetPathName(), *DesiredPackagePath, *DesiredObjectName);
+			TArray<FAssetRenameData> AssetsToRename;
+			AssetsToRename.Emplace(NewAsset, DesiredPackagePath, DesiredObjectName);
+			AssetToolsModule.Get().RenameAssets(AssetsToRename);
+		}
+
+		UPackage* NewPkg = NewAsset->GetOutermost();
+		if (NewPkg)
+		{
+			NewPkg->MarkPackageDirty();
+			UEditorLoadingAndSavingUtils::SavePackages({ NewPkg }, false);
+		}
 	}
 }
 

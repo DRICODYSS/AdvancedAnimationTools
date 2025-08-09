@@ -132,29 +132,63 @@ void SRetargetAnimsWidget::OnFinishedChangingSelectionProperties(const FProperty
 		return;
 	}
 
-	const bool ChangedRetargeter = PropertyChangedEvent.Property->GetName() == "RetargetAsset";
-	if (ChangedRetargeter)
+	if (PropertyChangedEvent.Property->GetName() == "RetargetAsset")
 	{
-		SetAssets(Settings->RetargetAsset, Settings->Path, Settings->RootFolderName, false);
+		SetAssets(
+			Settings->RetargetAsset,
+			Settings->bReplaceReferences,
+			Settings->bUseCustomPath,
+			Settings->Path,
+			Settings->RootFolderName
+		);
 	}
 
-	const bool ChangedPath = PropertyChangedEvent.Property->GetName() == "Path";
-	if (ChangedPath)
+	if (PropertyChangedEvent.Property->GetName() == "bReplaceReferences")
 	{
-		SetAssets(Settings->RetargetAsset, Settings->Path, Settings->RootFolderName, false);
+		SetAssets(
+			Settings->RetargetAsset,
+			Settings->bReplaceReferences,
+			Settings->bUseCustomPath,
+			Settings->Path,
+			Settings->RootFolderName
+		);
 	}
 
-	const bool ChangedRootFolderName = PropertyChangedEvent.Property->GetName() == "RootFolderName";
-	if (ChangedRootFolderName)
+	if (PropertyChangedEvent.Property->GetName() == "bUseCustomPath")
 	{
-		SetAssets(Settings->RetargetAsset, Settings->Path, Settings->RootFolderName, false);
+		SetAssets(
+			Settings->RetargetAsset,
+			Settings->bReplaceReferences,
+			Settings->bUseCustomPath,
+			Settings->Path,
+			Settings->RootFolderName
+		);
 	}
 
-	// const bool ChangedBindDependenciesToNewAssets = PropertyChangedEvent.Property->GetName() == "bBindDependenciesToNewAssets";
-	// if (ChangedBindDependenciesToNewAssets)
-	// {
-	// 	SetAssets(Settings->RetargetAsset, Settings->Path, Settings->RootFolderName, false);
-	// }
+	if (Settings->bUseCustomPath)
+	{
+		if (PropertyChangedEvent.Property->GetName() == "Path")
+		{
+			SetAssets(
+				Settings->RetargetAsset,
+				Settings->bReplaceReferences,
+				Settings->bUseCustomPath,
+				Settings->Path,
+				Settings->RootFolderName
+			);
+		}
+
+		if (PropertyChangedEvent.Property->GetName() == "RootFolderName")
+		{
+			SetAssets(
+				Settings->RetargetAsset,
+				Settings->bReplaceReferences,
+				Settings->bUseCustomPath,
+				Settings->Path,
+				Settings->RootFolderName
+			);
+		}
+	}
 }
 
 bool SRetargetAnimsWidget::CanExportAnimations() const
@@ -244,7 +278,13 @@ void SRetargetAnimsWidget::ShowWindow()
 	FSlateApplication::Get().AddWindow(Window.ToSharedRef());
 }
 
-void SRetargetAnimsWidget::SetAssets(UIKRetargeter* Retargeter, FName Path, FName RootFolderName, bool bBindDependenciesToNewAssets)
+void SRetargetAnimsWidget::SetAssets(
+	UIKRetargeter* Retargeter,
+	bool bReplaceReferences,
+	bool bUseCustomPath,
+	FName Path,
+	FName RootFolderName
+)
 {
 	//LogView->ClearLog();
 
@@ -257,12 +297,13 @@ void SRetargetAnimsWidget::SetAssets(UIKRetargeter* Retargeter, FName Path, FNam
 	BatchContext.SourceMesh = SourceMesh;
 	BatchContext.TargetMesh = TargetMesh;
 	BatchContext.IKRetargetAsset = Retargeter;
+	BatchContext.bReplaceReferences = bReplaceReferences;
 
 	BatchContext.TargetMesh = TargetMesh;
 
+	BatchContext.bUseCustomPath = bUseCustomPath;
 	BatchContext.Path = Path.ToString();
 	BatchContext.RootFolderName = RootFolderName.ToString();
-	BatchContext.bBindDependenciesToNewAssets = bBindDependenciesToNewAssets;
 
 	// Viewport->SetSkeletalMesh(SourceMesh, ERetargetSourceOrTarget::Source);
 	// Viewport->SetSkeletalMesh(TargetMesh, ERetargetSourceOrTarget::Target);
