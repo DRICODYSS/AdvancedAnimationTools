@@ -28,12 +28,12 @@ struct ADVANCEDANIMATIONTOOLS_API FAAT_IKRetargetBatchOperationContext
 	USkeletalMesh* TargetMesh = nullptr;
 	UIKRetargeter* IKRetargetAsset = nullptr;
 	EditorAnimUtils::FNameDuplicationRule NameRule;
-	bool bUseSourcePath = true;
+	bool bReplaceReferences = false;
+	bool bUseCustomPath = false;
 	bool bOverwriteExistingFiles = false;
 	bool bIncludeReferencedAssets = true;
 	bool bExportOnlyAnimatedBones = true;
 	bool bRetainAdditiveFlags = true;
-	bool bBindDependenciesToNewAssets = false;
 
 	FString Path = "";
 	FString RootFolderName = "Animations";

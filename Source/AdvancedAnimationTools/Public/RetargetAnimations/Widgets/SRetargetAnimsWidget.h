@@ -48,7 +48,13 @@ public:
 	virtual void AddReferencedObjects(FReferenceCollector& Collector) override;
 
 private:
-	void SetAssets(UIKRetargeter* Retargeter, FName Path, FName RootFolderName, bool bBindDependenciesToNewAssets);
+	void SetAssets(
+		UIKRetargeter* Retargeter,
+		bool bReplaceReferences,
+		bool bUseCustomPath,
+		FName Path,
+		FName RootFolderName
+	);
 	void ShowAssetWarnings();
 
 	void OnFinishedChangingSelectionProperties(const FPropertyChangedEvent& PropertyChangedEvent);
